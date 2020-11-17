@@ -31,7 +31,7 @@ def get_colors(hist, centroids):
 	# return the bar chart
 	return mapped_colors
 
-def get_rgb_colors(colors):
+def get_hex_colors(colors):
 	hex_colors = []
 	for color in colors:
 		hex =  '#%02x%02x%02x' % tuple(color)

@@ -35,6 +35,8 @@ hist = utils.centroid_histogram(clt)
 colors = utils.get_colors(hist, clt.cluster_centers_)
 
 
+
+
 print(colors)
 
 # python3 segment.py -i img.jpg -c 5

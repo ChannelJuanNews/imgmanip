@@ -120,10 +120,21 @@ for i in range(args["clusters"]):
 quant = cv2.cvtColor(quant, cv2.COLOR_BGR2RGB)
 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
+
+cv2.namedWindow('canny', cv2.WINDOW_NORMAL)
+cv2.resizeWindow('canny', 2000,2000)
+canny = cv2.Canny(final_result, 70, 70)
+white_background = np.full(final_result.shape, 255, dtype=np.uint8) 
+mask = canny != 255
+final_canny = white_background * (mask[:,:,None].astype(white_background.dtype))
+
+cv2.imshow('canny', final_canny)
+cv2.waitKey()
+
 #cv2.namedWindow('images', cv2.WINDOW_NORMAL)
 #cv2.resizeWindow('images', 2000,2000)
 #cv2.imshow("images", np.hstack([image, quant, final_result]))
-cv2.imwrite('output.jpg', np.hstack([image, quant, final_result]) )
+cv2.imwrite('output.jpg', np.hstack([image, quant, final_result, final_canny ]) )
 #cv2.waitKey()
 
 

@@ -13,33 +13,103 @@ args = vars(ap.parse_args())
 
 # load the image and grab its width and height
 image = cv2.imread(args["image"])
-image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-(h, w) = image.shape[:2]
+
 # convert the image from the RGB color space to the L*a*b*
 # color space -- since we will be clustering using k-means
 # which is based on the euclidean distance, we'll use the
-# L*a*b* color space where the euclidean distance implies
-# perceptual meaning
+# L(ightness) * A (color from Green to magenta * B (color from blue to yellow)
+# This color space where the euclidean distance implies perceptual meaning
+image = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+image = cv2.cvtColor(image, cv2.COLOR_LAB2BGR)
 
-# reshape the image into a feature vector so that k-means
-# can be applied
+
+
+
+
+# get image dimensions for algorithms 
+(h, w) = image.shape[:2]
+
+
+# reshape the image into a feature vector so that k-means can be applied
 image = image.reshape((image.shape[0] * image.shape[1], 3))
 # apply k-means using the specified number of clusters and
 # then create the quantized image based on the predictions
 clt = MiniBatchKMeans(n_clusters = args["clusters"])
 
+# grab the labels that were generated with kmeans 
+# usually will be a list of numbers from 0 to N where N is the number of clusters
 labels = clt.fit_predict(image)
-quant = clt.cluster_centers_.astype("uint8")[labels]
 
-hist = utils.centroid_histogram(clt)
-
-rgb_colors = utils.get_colors(hist, clt.cluster_centers_)
-
-hex_colors = utils.get_hex_colors(rgb_colors)
+# generate a list of unique labels from the labels object
+# example list of unique labels looks like this 
+# [0 1 2 3 4 ] 
+numLabels = np.arange(0, len(np.unique(clt.labels_)) + 1)
 
 
-# reshape the feature vectors to images
-quant = quant.reshape((h, w, 3))
+# 2 step process in a one liner 
+# 1. 
+# the cluster_center should be an array of length N where N is the number of clusters
+# and each item in the array/list is the quantized colorspace value (sort of)
+# as each (R,G,B) OR (L,A,B) value will be a float and not an intger
+# we will need to flatten/round the values later
+# example cluster centers looks like this 
+#  [
+#   [ 49.94716975 129.40613757 133.99778298]
+#   [128.31349142 123.07266482 144.54975432]
+#   [174.47337638 133.6048346  132.49002635]
+#   [137.25054687 190.08033083 190.13393293]
+#   [ 89.667345   123.04586927 137.8495374 ]
+# ]
+# 2. coerces the pixels that are labeled as part of a
+# cluster into the assoicated color value. The output is an array of 
+# length N where N is the total number of pixels
+# example coercing looks like this 
+# [ 
+#  [ 88 123 137]
+#  [ 88 123 137]
+#  [ 88 123 137]
+#  ...
+#  [ 47 129 134]
+#  [ 47 129 134]
+#  [ 47 129 134]
+# ]
+# as you can see, the coerced values look similiar to the cluster center values
+quantized = clt.cluster_centers_.astype("uint8")[labels]
+
+
+# map all the labels into their respective bins 
+# this returns a tuple with 2 values 
+# first is a list with the number of pixels labeled to each bin 
+# second is a list of the labels 
+# example histogram looks like this 
+# ([5755879 8343635 1380439 2686080 3952367] [0 1 2 3 4 5]
+(hist, hist_labels) = np.histogram(clt.labels_, bins = numLabels)
+
+# normalize the histogram, such that it sums to one
+hist = hist.astype("float")
+hist /= hist.sum()
+
+# initialize the bar chart representing the relative frequency
+# of each of the colors
+bar = np.zeros((50, 300, 3), dtype = "uint8")
+
+# create empty mapped colors array to contain the color space values for each 
+# cluster that was generated with kmeans. This will save the colorspace value 
+# as well as the frequency that that color showed up as a percentage of 100
+mapped_colors = []
+rgb_colors = []
+for (percent, color) in zip(hist, clt.cluster_centers_):
+    print(percent, color)
+    mapped_colors.append( (color.astype("uint8").tolist(), percent ) )
+    rgb_colors.append( color.astype("uint8").tolist() )
+   
+
+
+#hex_colors = utils.get_hex_colors(rgb_colors)
+
+
+# reshape the feature vectors to images for opencv to use 
+quantized = quantized.reshape((h, w, 3))
 image = image.reshape((h, w, 3))
 
 
@@ -63,34 +133,41 @@ image = image.reshape((h, w, 3))
 #plt.show()
 
 
+
 masks = []
 
 # use the rgb colors to mask the quantized image 
 for i in range(args["clusters"]):
-    mask = cv2.inRange(quant, np.array(rgb_colors[i]), np.array(rgb_colors[i]))
+    mask = cv2.inRange(quantized, np.array(rgb_colors[i]), np.array(rgb_colors[i]))
+   
+    
+    
     #cv2.namedWindow('MASK IS', cv2.WINDOW_NORMAL)
     #cv2.resizeWindow('MASK IS', 1000,1000)
     #cv2.imshow("MASK IS", mask)
     
-    res = cv2.bitwise_and(quant, quant, mask = mask)
+    res = cv2.bitwise_and(quantized, quantized, mask = mask)
     # turn the resulting mask to gray color space 
     gray_image = cv2.cvtColor(res, cv2.COLOR_BGR2GRAY)
     ret, thresh = cv2.threshold(gray_image, 50, 255, cv2.THRESH_BINARY)
     contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     cv2.drawContours(res, contours, -1, (105, 105, 105))
     
-    res = cv2.cvtColor(res, cv2.COLOR_BGR2RGB)
-    cv2.imwrite('mask-{}.jpg'.format(i), res)
+    #res = cv2.cvtColor(res, cv2.COLOR_BGR2RGB)
+
+
+
+
+    cv2.imwrite('mask-{}.jpg'.format('-'.join(str(s) for s in rgb_colors[i])), res)
     masks.append(res.copy())
     #cv2.namedWindow('result', cv2.WINDOW_NORMAL)
     #cv2.resizeWindow('result', 1000,1000)
     #cv2.imshow("result", res)
     #cv2.waitKey()
     
+final_result = quantized.copy()
 
-
-final_result = quant.copy()
-final_result = cv2.cvtColor(final_result, cv2.COLOR_BGR2RGB)
+#final_result = cv2.cvtColor(final_result, cv2.COLOR_BGR2RGB)
 
 for i in range(args["clusters"]):
     # I want to put logo on top-left corner, So I create a ROI
@@ -101,7 +178,6 @@ for i in range(args["clusters"]):
     img2gray = cv2.cvtColor(masks[i] , cv2.COLOR_BGR2GRAY)
     ret, mask = cv2.threshold(img2gray, 50, 255, cv2.THRESH_BINARY)
     mask_inv = cv2.bitwise_not(mask)
-
 
     # Now black-out the area of logo in ROI
     bg = cv2.bitwise_and(roi,roi,mask = mask_inv)
@@ -117,13 +193,13 @@ for i in range(args["clusters"]):
     #cv2.imshow('FINAL RESULT', final_result)
     #cv2.waitKey()
 
-quant = cv2.cvtColor(quant, cv2.COLOR_BGR2RGB)
-image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+#quant = cv2.cvtColor(quant, cv2.COLOR_BGR2RGB)
+#image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
 
 cv2.namedWindow('canny', cv2.WINDOW_NORMAL)
 cv2.resizeWindow('canny', 2000,2000)
-canny = cv2.Canny(final_result, 70, 70)
+canny = cv2.Canny(final_result, 250, 250)
 white_background = np.full(final_result.shape, 255, dtype=np.uint8) 
 mask = canny != 255
 final_canny = white_background * (mask[:,:,None].astype(white_background.dtype))
@@ -134,7 +210,7 @@ cv2.waitKey()
 #cv2.namedWindow('images', cv2.WINDOW_NORMAL)
 #cv2.resizeWindow('images', 2000,2000)
 #cv2.imshow("images", np.hstack([image, quant, final_result]))
-cv2.imwrite('output.jpg', np.hstack([image, quant, final_result, final_canny ]) )
+cv2.imwrite('output.jpg', np.hstack([image, quantized, final_result, final_canny ]) )
 #cv2.waitKey()
 
 

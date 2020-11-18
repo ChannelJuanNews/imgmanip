@@ -22,7 +22,7 @@ args = vars(ap.parse_args())
 image = cv2.imread(args["image"])
 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 image = image.reshape((image.shape[0] * image.shape[1], 3))
-clt = KMeans(n_clusters = args["clusters"])
+clt = KMeans(n_clusters = aaurgs["clusters"])
 clt.fit(image)
 
 

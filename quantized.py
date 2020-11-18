@@ -22,6 +22,11 @@ image = cv2.imread(args["image"])
 image = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
 image = cv2.cvtColor(image, cv2.COLOR_LAB2BGR)
 
+# do canny edge detection to compare after post processing
+canny_first = cv2.Canny(image, 50, 50)
+white_background = np.full(image.shape, 255, dtype=np.uint8) 
+mask = canny_first != 255
+canny_first = white_background * (mask[:,:,None].astype(white_background.dtype))
 
 
 
@@ -97,15 +102,15 @@ bar = np.zeros((50, 300, 3), dtype = "uint8")
 # cluster that was generated with kmeans. This will save the colorspace value 
 # as well as the frequency that that color showed up as a percentage of 100
 mapped_colors = []
-rgb_colors = []
+bgr_colors = []
 for (percent, color) in zip(hist, clt.cluster_centers_):
     print(percent, color)
     mapped_colors.append( (color.astype("uint8").tolist(), percent ) )
-    rgb_colors.append( color.astype("uint8").tolist() )
+    bgr_colors.append( color.astype("uint8").tolist() )
    
 
 
-#hex_colors = utils.get_hex_colors(rgb_colors)
+#hex_colors = utils.get_hex_colors(bgr_colors)
 
 
 # reshape the feature vectors to images for opencv to use 
@@ -138,7 +143,8 @@ masks = []
 
 # use the rgb colors to mask the quantized image 
 for i in range(args["clusters"]):
-    mask = cv2.inRange(quantized, np.array(rgb_colors[i]), np.array(rgb_colors[i]))
+    # define the mask according to the stored colors 
+    mask = cv2.inRange(quantized, np.array(bgr_colors[i]), np.array(bgr_colors[i]))
    
     
     
@@ -146,26 +152,53 @@ for i in range(args["clusters"]):
     #cv2.resizeWindow('MASK IS', 1000,1000)
     #cv2.imshow("MASK IS", mask)
     
+    # get 
     res = cv2.bitwise_and(quantized, quantized, mask = mask)
+ 
+
+
     # turn the resulting mask to gray color space 
     gray_image = cv2.cvtColor(res, cv2.COLOR_BGR2GRAY)
-    ret, thresh = cv2.threshold(gray_image, 50, 255, cv2.THRESH_BINARY)
-    contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    cv2.drawContours(res, contours, -1, (105, 105, 105))
+
+    # threshold the values 
+    ret, thresh = cv2.threshold(gray_image, 100, 255, cv2.THRESH_BINARY)
     
-    #res = cv2.cvtColor(res, cv2.COLOR_BGR2RGB)
+    # get the blue, green and red channels from the starter result
+    b, g, r = cv2.split(res)
+
+    # some more rgba stuff
+    rgba = [b,g,r, thresh]
+
+    # this is the rgba image (has alpha channel)
+    RGBA_RES = cv2.merge(rgba,4)
+    cv2.imwrite("test-{}.png".format(i), RGBA_RES)
+
+    
+    contours, hierarchy = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    #print(contours)
+    for cnt in contours:
+        x,y,w,h = cv2.boundingRect(cnt)
+        #center_x = int( (w-x)/2 )
+        #center_y = int( (h-y)/2 )
+        print(x, y, w, h)
+        #cv2.putText(res, str(i), (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.1, (36,255,12), 2)
+
+    cv2.drawContours(res, contours, -1, (105, 105, 105))
+
+    #cv2.imshow("bb img", res)
+    #cv2.waitKey()
+ 
 
 
-
-
-    cv2.imwrite('mask-{}.jpg'.format('-'.join(str(s) for s in rgb_colors[i])), res)
-    masks.append(res.copy())
+    cv2.imwrite('mask-{}.png'.format('-'.join(str(s) for s in bgr_colors[i])), RGBA_RES)
+    masks.append( res.copy())
     #cv2.namedWindow('result', cv2.WINDOW_NORMAL)
     #cv2.resizeWindow('result', 1000,1000)
     #cv2.imshow("result", res)
     #cv2.waitKey()
     
 final_result = quantized.copy()
+
 
 #final_result = cv2.cvtColor(final_result, cv2.COLOR_BGR2RGB)
 
@@ -176,7 +209,12 @@ for i in range(args["clusters"]):
 
     # Now create a mask of logo and create its inverse mask also
     img2gray = cv2.cvtColor(masks[i] , cv2.COLOR_BGR2GRAY)
-    ret, mask = cv2.threshold(img2gray, 50, 255, cv2.THRESH_BINARY)
+    ret, mask = cv2.threshold(img2gray, 100, 255, cv2.THRESH_BINARY)
+
+
+    
+
+
     mask_inv = cv2.bitwise_not(mask)
 
     # Now black-out the area of logo in ROI
@@ -199,18 +237,25 @@ for i in range(args["clusters"]):
 
 cv2.namedWindow('canny', cv2.WINDOW_NORMAL)
 cv2.resizeWindow('canny', 2000,2000)
-canny = cv2.Canny(final_result, 250, 250)
+canny = cv2.Canny(final_result, 100, 250)
 white_background = np.full(final_result.shape, 255, dtype=np.uint8) 
 mask = canny != 255
 final_canny = white_background * (mask[:,:,None].astype(white_background.dtype))
 
-cv2.imshow('canny', final_canny)
+cv2.imshow("final canny", canny_first)
 cv2.waitKey()
+
+
+canny_diff = cv2.bitwise_and( final_result,canny_first, mask = None) 
+
+
+#cv2.imshow('canny', final_canny)
+#cv2.waitKey()
 
 #cv2.namedWindow('images', cv2.WINDOW_NORMAL)
 #cv2.resizeWindow('images', 2000,2000)
 #cv2.imshow("images", np.hstack([image, quant, final_result]))
-cv2.imwrite('output.jpg', np.hstack([image, quantized, final_result, final_canny ]) )
+cv2.imwrite('output.jpg', np.hstack([image, quantized, final_result, final_canny, canny_first, canny_diff ]) )
 #cv2.waitKey()
 
 

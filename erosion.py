@@ -141,8 +141,8 @@ for i in range(args["clusters"]):
 kernel = np.ones((5,5),np.uint8)
 erosion = cv2.erode(final_image,kernel,iterations = 1)
 
-negative = cv2.bitwise_not(erosion)
-#out = cv2.morphologyEx(negative, cv2.MORPH_CLOSE, kernel)
+out = cv2.bitwise_not(erosion)
+#out = cv2.morphologyEx(out, cvgit 2.MORPH_CLOSE, kernel)
 #out = cv2.morphologyEx(out, cv2.MORPH_CLOSE, kernel)
 #out = cv2.morphologyEx(out, cv2.MORPH_CLOSE, kernel)
 #out = cv2.morphologyEx(out, cv2.MORPH_CLOSE, kernel)

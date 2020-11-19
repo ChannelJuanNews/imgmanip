@@ -20,10 +20,10 @@ def get_colors(hist, centroids):
 	# each cluster
 	mapped_colors = []
 	for (percent, color) in zip(hist, centroids):
-		mapped_colors.append(color.astype("uint8").tolist())
-		# print(color.astype("uint8").tolist())
-		# plot the relative percentage of each cluster
+		#mapped_colors.append(color.astype("uint8").tolist())
 		endX = startX + (percent * 300)
+		# plot the relative percentage of each cluster
+		
 		
 		cv2.rectangle(bar, (int(startX), 0), (int(endX), 50), color.astype("uint8").tolist(), -1)
 		startX = endX

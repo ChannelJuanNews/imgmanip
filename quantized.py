@@ -108,10 +108,7 @@ for (percent, color) in zip(hist, clt.cluster_centers_):
     mapped_colors.append( (color.astype("uint8").tolist(), percent ) )
     bgr_colors.append( color.astype("uint8").tolist() )
    
-
-
 #hex_colors = utils.get_hex_colors(bgr_colors)
-
 
 # reshape the feature vectors to images for opencv to use 
 quantized = quantized.reshape((h, w, 3))
@@ -152,7 +149,7 @@ for i in range(args["clusters"]):
     #cv2.resizeWindow('MASK IS', 1000,1000)
     #cv2.imshow("MASK IS", mask)
     
-    # get 
+    #get 
     res = cv2.bitwise_and(quantized, quantized, mask = mask)
  
 
@@ -210,10 +207,6 @@ for i in range(args["clusters"]):
     # Now create a mask of logo and create its inverse mask also
     img2gray = cv2.cvtColor(masks[i] , cv2.COLOR_BGR2GRAY)
     ret, mask = cv2.threshold(img2gray, 100, 255, cv2.THRESH_BINARY)
-
-
-    
-
 
     mask_inv = cv2.bitwise_not(mask)
 
